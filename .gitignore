@@ -7,3 +7,16 @@ venv/
 static/response_*.mp3
 static/response_*.wav
 notifications.json
+\n# Large media folders\nstatic/videos/
+static/video2/
+story/
+templates/story/
+sounds/
+templates/sounds/
+\n# IDE
+.idea/
+.vscode/
+\n# Test artifacts
+project_report.json
+test_results.json
+temp_audio.wav
