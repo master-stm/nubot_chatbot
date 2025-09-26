@@ -1,0 +1,28 @@
+# Copy this file to .env and fill in your actual values
+
+# OpenAI API Configuration
+OPENAI_API_KEY=your-openai-api-key-here
+
+# Application Configuration
+FLASK_ENV=development
+FLASK_DEBUG=True
+PORT=8080
+
+# Hardware Configuration (for Raspberry Pi)
+LED_PIN_RED=18
+LED_PIN_GREEN=23
+LED_PIN_BLUE=24
+BUZZER_PIN=25
+
+# Audio Configuration
+DEFAULT_VOICE=en
+OFFLINE_MODE=False
+AUDIO_SAMPLE_RATE=22050
+
+# Game Configuration
+MAX_GAME_LEVELS=5
+DEFAULT_LANGUAGE=en
+
+# Emotion Detection
+EMOTION_SENSITIVITY=0.7
+NOTIFICATION_ENABLED=True

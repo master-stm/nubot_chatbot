@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Nubot - Voice Assistant</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: black;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #video-background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -1;
+    }
+
+    #chat-box {
+      position: absolute;
+      bottom: 15%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      max-width: 600px;
+      padding: 10px;
+      font-size: 18px;
+      font-weight: bold;
+      color: white;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: 5px;
+      text-align: center;
+    }
+
+    #lang-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    #games-button {
+      position: fixed;
+      top: 50px;
+      right: 10px;
+      background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 25px;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    #games-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+      background: linear-gradient(45deg, #ff5252, #26a69a);
+    }
+
+    #games-button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <video id="video-background" autoplay muted loop>
+    <source id="video-source" src="/static/videos/New_Blinks.mp4" type="video/mp4" />
+  </video>
+
+  <div id="chat-box">Waiting for your voice...</div>
+  <button id="lang-toggle" onclick="toggleLanguage()">AR</button>
+  <button id="games-button" onclick="goToGames()">🎮 Games</button>
+  <!-- <button id="audio-test" onclick="testAudio()" style="position: fixed; top: 90px; right: 10px; background: #ff6b6b; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">🔊 Test Audio</button> -->
+  <audio id="robot-audio"></audio>
+
+  <script>
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let currentLang = "en";
+    let isProcessing = false;
+    let currentVideoState = "blinking";
+    let currentResponse = ""; // Store current response
+    let hasPlayedWelcome = false; // Play welcome once
+
+    const videoStates = {
+      angry: "/static/videos/New_ Angry.mp4",
+      sad: "/static/videos/New_sad.mp4",
+      playing: "/static/videos/New_waiting.mp4",
+      happy: "/static/videos/New_emotion_love.mp4",
+      surprise: "/static/videos/New_wink.mp4",
+      blinking: "/static/videos/New_Blinks.mp4"
+    };
+
+    function updateChat(text) {
+      // Keep the current response visible
+      if (text && text !== currentResponse) {
+        currentResponse = text;
+        document.getElementById("chat-box").textContent = text;
+      }
+    }
+
+    function clearChat() {
+      // Clear the chat box for new interaction
+      currentResponse = "";
+      document.getElementById("chat-box").textContent = "Waiting for your voice...";
+    }
+
+    function stopRecognition() {
+      if (recognition) {
+        recognition.abort();
+        recognition.onresult = recognition.onerror = recognition.onend = null;
+        recognition = null;
+      }
+    }
+
+    function startRecognition() {
+      if (!SpeechRecognition) {
+        updateChat("Speech Recognition not supported.");
+        return;
+      }
+      stopRecognition();
+
+      recognition = new SpeechRecognition();
+      recognition.lang = currentLang === "en" ? "en-US" : "ar-SA";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        // On first start, play a welcome message then resume recognition
+        if (!hasPlayedWelcome) {
+          hasPlayedWelcome = true;
+          stopRecognition();
+          isProcessing = true;
+          fetchWelcome();
+          return;
+        }
+        clearChat(); // Clear previous response when starting new recognition
+        updateChat("Listening...");
+      };
+      recognition.onerror = () => retryRecognition();
+      recognition.onend = () => {
+        if (!isProcessing) retryRecognition();
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        if (transcript) {
+          isProcessing = true;
+          updateChat("Processing...");
+          fetchResponse(transcript);
+        } else {
+          retryRecognition();
+        }
+      };
+
+      recognition.start();
+    }
+
+    function retryRecognition() {
+      stopRecognition();
+      if (!isProcessing) {
+        setTimeout(startRecognition, 500);
+      }
+    }
+
+    function fetchResponse(transcript) {
+      const startTime = Date.now(); // Start timing
+
+      fetch("/get_response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: transcript, lang: currentLang })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const responseTime = Date.now() - startTime;
+        console.log(`Response time: ${responseTime}ms`);
+
+        // Keep response displayed and don't clear it yet
+        updateChat(data.text || "Hmm...");
+        playEmotionVideo(analyzeEmotion(data.text || ""));
+
+        // ✅ If backend says redirect, immediately go to games page
+        if (data.redirect) {
+          window.location.href = data.redirect;
+        } else if (data.audio) {
+          playAudio(data.audio);
+        } else {
+          // No audio response, keep text visible for a moment then continue
+          isProcessing = false;
+          setTimeout(() => {
+            retryRecognition();
+          }, 2000); // Keep text visible for 2 seconds when no audio
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        updateChat("Something went wrong.");
+        isProcessing = false;
+        setTimeout(() => {
+          retryRecognition();
+        }, 2000);
+      });
+    }
+
+    function fetchWelcome() {
+      const text = currentLang === "ar" ? "مرحباً" : "Hello";
+      fetch("/get_response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang: currentLang })
+      })
+      .then(res => res.json())
+      .then(data => {
+        // Show welcome text and play audio if available
+        updateChat(data.text || (currentLang === "ar" ? "أهلاً بك!" : "Welcome!"));
+        playEmotionVideo(analyzeEmotion(data.text || ""));
+        if (data.redirect) {
+          window.location.href = data.redirect;
+        } else if (data.audio) {
+          playAudio(data.audio);
+        } else {
+          isProcessing = false;
+          retryRecognition();
+        }
+      })
+      .catch(() => {
+        // If welcome fetch fails, continue normally
+        isProcessing = false;
+        retryRecognition();
+      });
+    }
+
+    function playAudio(src) {
+      const audio = document.getElementById("robot-audio");
+      audio.src = src;
+
+      audio.onerror = () => {
+        console.warn("Audio failed to play.");
+        isProcessing = false;
+        // Keep the response text visible even if audio fails
+        setTimeout(() => {
+          retryRecognition();
+        }, 1000);
+      };
+
+      audio.onended = () => {
+        isProcessing = false;
+        // Audio finished playing, now we can restart recognition
+        // The response text will remain visible until next interaction
+        retryRecognition();
+      };
+
+      audio.play().catch(() => {
+        console.warn("Audio play was blocked or failed.");
+        isProcessing = false;
+        // Keep the response text visible even if audio play is blocked
+        setTimeout(() => {
+          retryRecognition();
+        }, 1000);
+      });
+    }
+
+    function analyzeEmotion(text) {
+      const emotions = {
+        happy: ["happy", "great", "excited", "awesome", "love", "سعيد"],
+        sad: ["sad", "worried", "bad", "حزين"],
+        surprise: ["wow", "amazing", "interesting", "مفاجئ"],
+        angry: ["angry", "mad", "غاضب", "upset"],
+        playing: ["play", "game", "wait", "لعب"]
+      };
+
+      const lowerText = text.toLowerCase();
+      for (const [emotion, list] of Object.entries(emotions)) {
+        if (list.some(word => lowerText.includes(word))) return emotion;
+      }
+      return "blinking";
+    }
+
+    function playEmotionVideo(state) {
+      if (state === currentVideoState) return;
+
+      const video = document.getElementById("video-background");
+      const source = document.getElementById("video-source");
+
+      currentVideoState = state;
+      source.src = videoStates[state];
+      video.load();
+      video.play();
+
+      video.onended = () => {
+        currentVideoState = "blinking";
+        source.src = videoStates["blinking"];
+        video.load();
+        video.play();
+      };
+    }
+
+    function toggleLanguage() {
+      if (isProcessing) return;
+      currentLang = currentLang === "en" ? "ar" : "en";
+      document.getElementById("lang-toggle").textContent = currentLang.toUpperCase();
+      stopRecognition();
+      startRecognition();
+    }
+
+    function goToGames() {
+      // Stop any ongoing recognition
+      stopRecognition();
+      // Redirect to games page
+      window.location.href = '/games';
+    }
+
+    function testAudio() {
+      // Test audio with a simple beep
+      const audio = document.getElementById("robot-audio");
+      const context = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      
+      oscillator.frequency.setValueAtTime(440, context.currentTime); // A note
+      gainNode.gain.setValueAtTime(0.3, context.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
+      
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.5);
+      
+      updateChat("Testing audio... Did you hear a beep?");
+    }
+
+    window.onload = () => {
+      document.getElementById("lang-toggle").textContent = currentLang.toUpperCase();
+      startRecognition();
+    };
+  </script>
+</body>
+</html>

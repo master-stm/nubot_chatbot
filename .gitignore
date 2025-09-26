@@ -1,0 +1,9 @@
+__pycache__/
+venv/
+.venv/
+*.pyc
+.env
+*.log
+static/response_*.mp3
+static/response_*.wav
+notifications.json

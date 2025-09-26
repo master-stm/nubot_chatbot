@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guess the Number</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fffaf0;
+      text-align: center;
+      padding: 30px;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #333;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.2rem;
+      color: #444;
+      min-height: 50px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔢 Guess the Number</h1>
+  <div id="status">I am thinking of a number between 1 and 10. Try to guess it by speaking!</div>
+
+  <script>
+    const statusBox = document.getElementById('status');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      statusBox.textContent = 'Sorry, your browser does not support speech recognition.';
+    } else {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+
+      function speak(text, callback = null) {
+        const synth = window.speechSynthesis;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = 'en-US';
+        utter.rate = 1;
+
+        let timeoutId;
+        let speechCut = false;
+
+        utter.onstart = () => {
+          timeoutId = setTimeout(() => {
+            speechCut = true;
+            synth.cancel();
+            if (callback) callback();
+          }, 5000);
+        };
+
+        utter.onend = () => {
+          clearTimeout(timeoutId);
+          if (!speechCut && callback) callback();
+        };
+
+        synth.speak(utter);
+        statusBox.textContent = text;
+      }
+
+      function speakInSteps(texts, index = 0, finalCallback = null) {
+        if (index >= texts.length) {
+          if (finalCallback) finalCallback();
+          return;
+        }
+        speak(texts[index], () => speakInSteps(texts, index + 1, finalCallback));
+      }
+
+      let numberToGuess = null;
+      let waitingForGuess = false;
+      let waitingForReplay = false;
+      let chancesLeft = 3;
+
+      function startGame() {
+        numberToGuess = Math.floor(Math.random() * 10) + 1;
+        chancesLeft = 3;
+        waitingForGuess = true;
+        waitingForReplay = false;
+        speak("I am thinking of a number between 1 and 10. You have 3 chances. Try to guess it!");
+      }
+
+      function handleGuess(guess) {
+        chancesLeft--;
+        if (guess === numberToGuess) {
+          speakInSteps([
+            `Yes! You're a genius! The number was ${numberToGuess}.`,
+            "Do you want to play again? Say yes or no."
+          ]);
+          waitingForGuess = false;
+          waitingForReplay = true;
+        } else if (chancesLeft <= 0) {
+          speakInSteps([
+            `Oops! You used all your chances. The number was ${numberToGuess}.`,
+            "Do you want to play again? Say yes or no."
+          ]);
+          waitingForGuess = false;
+          waitingForReplay = true;
+        } else if (guess < numberToGuess) {
+          speak(`Higher! You have ${chancesLeft} ${chancesLeft === 1 ? 'chance' : 'chances'} left. Try again.`);
+        } else if (guess > numberToGuess) {
+          speak(`Lower! You have ${chancesLeft} ${chancesLeft === 1 ? 'chance' : 'chances'} left. Try again.`);
+        }
+      }
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+        console.log("Heard:", transcript);
+
+        if (transcript.includes("go back") || transcript.includes("back") || transcript.includes("return")) {
+          speak("Going back to the games hub.");
+          setTimeout(() => {
+            window.location.href = '/games';
+          }, 3000);
+          return;
+        }
+
+        if (waitingForReplay) {
+          if (transcript.includes("yes")) {
+            startGame();
+          } else if (transcript.includes("no")) {
+            waitingForReplay = false;
+            speak("Okay! Going back to the games hub.");
+            setTimeout(() => {
+              window.location.href = '/games';
+            }, 3000);
+          } else {
+            speak("Please say yes or no.");
+          }
+          return;
+        }
+
+        if (waitingForGuess) {
+          const guess = parseInt(transcript);
+          if (!isNaN(guess) && guess >= 1 && guess <= 10) {
+            handleGuess(guess);
+          } else {
+            speak("Please guess a number between 1 and 10.");
+          }
+          return;
+        }
+
+        speak("Say your guess as a number between 1 and 10, or say 'go back' to return to the games hub.");
+      };
+
+      window.onload = () => {
+        recognition.start();
+        startGame();
+      };
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Guess the Animal Sound</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #fffaf0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .container {
+      display: flex;
+      width: 90%;
+      max-width: 1200px;
+      align-items: center;
+      gap: 40px;
+    }
+    .image-side img {
+      max-width: 100%;
+      height: auto;
+      max-height: 80vh;
+      border-radius: 10px;
+    }
+    .text-side {
+      flex: 1;
+      text-align: center;
+    }
+    h1 { font-size: 3rem; color: #333; margin-bottom: 20px; }
+    #status { font-size: 2rem; color: #444; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="image-side">
+      <img src="{{ url_for('static', filename='images/guess.png') }}" alt="Guess Image" />
+    </div>
+    <div class="text-side">
+      <h1>🐾 Guess the Animal Sound!</h1>
+      <div id="status">Getting ready...</div>
+      <audio id="robot-audio"></audio>
+    </div>
+  </div>
+
+  <script>
+    const statusBox = document.getElementById('status');
+    const audioElement = document.getElementById('robot-audio');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let isProcessing = false;
+
+    function updateStatus(text) {
+      statusBox.textContent = text;
+    }
+
+    function stopRecognition() {
+      if (recognition) {
+        recognition.abort();
+        recognition.onresult = recognition.onerror = recognition.onend = null;
+        recognition = null;
+      }
+    }
+
+    function startRecognition() {
+      stopRecognition();
+      recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => updateStatus("🎤 Listening...");
+      recognition.onerror = () => retryRecognition();
+      recognition.onend = () => { if (!isProcessing) retryRecognition(); };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim().toLowerCase();
+        console.log("Heard:", transcript);
+        if (["stop", "back to chat", "don't want to play", "no play", "exit"].some(kw => transcript.includes(kw))) {
+          updateStatus("Okay, going back to chatting...");
+          setTimeout(() => window.location.href = "/", 1500);
+          return;
+        }
+        if (transcript) {
+          isProcessing = true;
+          updateStatus("Processing...");
+          sendToGPT(transcript);
+        } else {
+          retryRecognition();
+        }
+      };
+
+      recognition.start();
+    }
+
+    function retryRecognition() {
+      stopRecognition();
+      if (!isProcessing) setTimeout(startRecognition, 500);
+    }
+
+    function sendToGPT(text) {
+      fetch("/get_response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text, lang: "en", source: "guess-animal" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        updateStatus(data.text || "Hmm...");
+        if (data.audio) {
+          stopRecognition(); // ensure we aren't listening while playing
+          audioElement.src = data.audio;
+          audioElement.onended = () => {
+            isProcessing = false;
+            startRecognition();
+          };
+          audioElement.play();
+        } else {
+          isProcessing = false;
+          setTimeout(startRecognition, 500);
+        }
+      })
+      .catch(err => {
+        console.error("Error:", err);
+        updateStatus("Something went wrong...");
+        isProcessing = false;
+        retryRecognition();
+      });
+    }
+
+    function startNewGame() {
+      sendToGPT("start");
+    }
+
+    window.onload = () => {
+      updateStatus("Let's start guessing! Say stop anytime to return to chat.");
+      startNewGame();
+    };
+  </script>
+</body>
+</html>

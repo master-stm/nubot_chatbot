@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tic-Tac-Toe Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f8ff;
+      text-align: center;
+      padding-top: 20px;
+    }
+    h1 {
+      font-size: 2rem;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 10px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .cell {
+      width: 100px;
+      height: 100px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      position: relative;
+    }
+    .number-label {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      font-size: 0.8rem;
+      color: #999;
+    }
+    #status {
+      font-size: 1.2rem;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>❌⭕ Let's Play Tic-Tac-Toe!</h1>
+  <div id="board"></div>
+  <div id="status">Say easy, medium, or hard to choose your level.</div>
+
+  <script>
+    let board = Array(9).fill(null);
+    const boardEl = document.getElementById('board');
+    const statusEl = document.getElementById('status');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+
+    let listeningForReplay = false;
+    let waitingForDifficulty = true;
+    let difficulty = 'easy';
+
+    function drawBoard() {
+      boardEl.innerHTML = '';
+      board.forEach((val, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.innerHTML = `<div class="number-label">${i + 1}</div>${val || ''}`;
+        boardEl.appendChild(cell);
+      });
+    }
+
+    function speak(text) {
+      const synth = window.speechSynthesis;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US';
+      synth.speak(utter);
+      statusEl.textContent = text;
+    }
+
+    function checkWinner(b) {
+      const lines = [
+        [0, 1, 2], [3, 4, 5], [6, 7, 8],
+        [0, 3, 6], [1, 4, 7], [2, 5, 8],
+        [0, 4, 8], [2, 4, 6]
+      ];
+      for (let [a, b1, c] of lines) {
+        if (b[a] && b[a] === b[b1] && b[a] === b[c]) {
+          return b[a];
+        }
+      }
+      return b.every(cell => cell) ? 'draw' : null;
+    }
+
+    function aiMove() {
+      const emptyIndices = board.map((val, i) => val === null ? i : null).filter(i => i !== null);
+      let move;
+
+      if (difficulty === 'easy') {
+        move = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+      } else if (difficulty === 'medium') {
+        move = emptyIndices.sort(() => Math.random() - 0.5)[0];
+      } else {
+        move = emptyIndices[0]; // pretend smart logic for hard
+      }
+
+      if (move !== undefined) {
+        board[move] = 'O';
+        drawBoard();
+        const result = checkWinner(board);
+        if (result === 'X') speak("Wow! You're really good! You win! 🎉");
+        else if (result === 'O') askReplay("Haha! I win! Want to play again? Say yes or no.");
+        else if (result === 'draw') askReplay("It’s a tie! That was fun. Do you want to play again? Say yes or no.");
+      }
+    }
+
+    function askReplay(message) {
+      speak(message);
+      listeningForReplay = true;
+    }
+
+    function resetGame() {
+      board = Array(9).fill(null);
+      drawBoard();
+      speak("Alright champ! Let’s play again! Just say a number from 1 to 9 to drop your X.");
+    }
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+      const match = transcript.match(/\d/);
+
+      if (waitingForDifficulty) {
+        if (transcript.includes("easy")) {
+          difficulty = 'easy';
+        } else if (transcript.includes("medium")) {
+          difficulty = 'medium';
+        } else if (transcript.includes("hard")) {
+          difficulty = 'hard';
+        } else {
+          speak("Please say easy, medium, or hard to start.");
+          return;
+        }
+        waitingForDifficulty = false;
+        speak(`Awesome choice, superstar! We're in ${difficulty} mode. You're X — say a number from 1 to 9 to make your move!`);
+        return;
+      }
+
+      if (listeningForReplay) {
+        if (transcript.includes("yes")) {
+          listeningForReplay = false;
+          waitingForDifficulty = true;
+          speak("Awesome! Let's pick the level again. Say easy, medium, or hard.");
+        } else if (transcript.includes("no")) {
+          listeningForReplay = false;
+          speak("No worries! Taking you back to the Games Page.");
+          setTimeout(() => {
+            window.location.href = "games.html";
+          }, 3000);
+        } else {
+          speak("Please say yes or no.");
+        }
+        return;
+      }
+
+      if (match) {
+        const index = parseInt(match[0]) - 1;
+        if (index >= 0 && index < 9 && !board[index]) {
+          board[index] = 'X';
+          drawBoard();
+          const result = checkWinner(board);
+          if (result === 'X') const winMessages = [
+  "Whoa! You're a Tic-Tac-Toe master! 🎉",
+  "Boom! You beat me fair and square! 🧠",
+  "You’re too smart! That was awesome! 😎",
+  "Winner winner! High five, champ! ✋",
+  "Amazing job! You totally crushed it! 🏆"
+];
+speak(winMessages[Math.floor(Math.random() * winMessages.length)]);
+          else if (result === 'draw') askReplay("That was close! It's a draw. Want to play again? Say yes or no.");
+          else aiMove();
+        } else {
+          speak("That spot is taken or not valid. Try another number.");
+        }
+      } else {
+        speak("Say a number between 1 and 9 to place your X.");
+      }
+    };
+
+    window.onload = () => {
+      drawBoard();
+      speak("Hey little buddy! Before we start our fun game, tell me — do you want easy, medium, or hard mode?");
+      recognition.start();
+    };
+  </script>
+</body>
+</html>

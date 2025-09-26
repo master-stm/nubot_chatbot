@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Magic Math ✨</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #e6f7ff;
+      text-align: center;
+      padding: 30px;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #333;
+    }
+    #question {
+      font-size: 1.5rem;
+      margin: 30px 0;
+    }
+    #status {
+      font-size: 1.2rem;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <h1>✨ Magic Math Game ✨</h1>
+  <div id="question">Say "start" to begin solving magic math!</div>
+  <div id="status"></div>
+
+  <script>
+    const statusBox = document.getElementById('status');
+    const questionBox = document.getElementById('question');
+
+    let currentAnswer = null;
+    let waitingForAnswer = false;
+    let waitingForReplay = false;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+
+    function speak(text) {
+      const synth = window.speechSynthesis;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US';
+      synth.speak(utter);
+      statusBox.textContent = text;
+    }
+
+    function generateQuestion() {
+      const num1 = Math.floor(Math.random() * 10) + 1;
+      const num2 = Math.floor(Math.random() * 10) + 1;
+      currentAnswer = num1 + num2;
+      const question = `What is ${num1} plus ${num2}?`;
+      questionBox.textContent = question;
+      speak(`Alright math wizard, ${question}`);
+      waitingForAnswer = true;
+    }
+
+    function askReplay() {
+      speak("Would you like to try another magic math question? Say yes or no.");
+      waitingForAnswer = false;
+      waitingForReplay = true;
+    }
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+      console.log("Heard:", transcript);
+
+      if (waitingForReplay) {
+        if (transcript.includes("yes")) {
+          waitingForReplay = false;
+          generateQuestion();
+        } else if (transcript.includes("no")) {
+          speak("Okay math star! Taking you back to the games page.");
+          setTimeout(() => {
+            window.location.href = '/games';
+          }, 3000);
+        } else {
+          speak("Please say yes or no.");
+        }
+        return;
+      }
+
+      if (transcript.includes("start")) {
+        generateQuestion();
+        return;
+      }
+
+      if (waitingForAnswer && currentAnswer !== null) {
+        const spokenNumber = parseInt(transcript.match(/\d+/));
+        if (spokenNumber === currentAnswer) {
+          speak("Yippee! That’s absolutely correct! 🧠✨");
+          askReplay();
+        } else {
+          speak("Oops, not quite. Try again!");
+        }
+      }
+    };
+
+    window.onload = () => {
+      recognition.start();
+      speak("Hi little genius! Say start when you're ready to play Magic Math!");
+    };
+  </script>
+</body>
+</html>

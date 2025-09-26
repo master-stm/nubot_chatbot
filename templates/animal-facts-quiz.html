@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Animal Facts Quiz</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fffaf0;
+      text-align: center;
+      padding: 30px;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #333;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.2rem;
+      color: #444;
+      min-height: 60px;
+    }
+  </style>
+</head>
+<body>
+  <h1>❓ Animal Facts Quiz</h1>
+  <div id="status">Say "start" or "ابدأ" to begin the quiz!</div>
+
+  <script>
+    const statusBox = document.getElementById('status');
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      statusBox.textContent = 'Sorry, your browser does not support speech recognition.';
+    } else {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US'; // You can change to 'ar-KW' for Arabic only
+      recognition.continuous = true;
+
+      // Speak function (cuts after 5 seconds)
+      function speak(text, callback = null) {
+        const synth = window.speechSynthesis;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = text.match(/[\u0600-\u06FF]/) ? 'ar-SA' : 'en-US'; // Arabic or English
+        utter.rate = 1;
+
+        let timeoutId;
+        let speechCut = false;
+
+        utter.onstart = () => {
+          timeoutId = setTimeout(() => {
+            speechCut = true;
+            synth.cancel();
+            if (callback) callback();
+          }, 5000);
+        };
+
+        utter.onend = () => {
+          clearTimeout(timeoutId);
+          if (!speechCut && callback) callback();
+        };
+
+        synth.speak(utter);
+        statusBox.textContent = text;
+      }
+
+      function speakInSteps(texts, index = 0, finalCallback = null) {
+        if (index >= texts.length) {
+          if (finalCallback) finalCallback();
+          return;
+        }
+        speak(texts[index], () => speakInSteps(texts, index + 1, finalCallback));
+      }
+
+      const quizQuestions = [
+        { question: "What animal says 'moo'? ما الحيوان الذي يصدر صوت مو؟", answers: ["cow", "a cow", "بقرة"] },
+        { question: "What animal says 'meow'? ما الحيوان الذي يصدر صوت مواء؟", answers: ["cat", "a cat", "قطة"] },
+        { question: "Which animal has a long trunk? ما الحيوان الذي لديه خرطوم طويل؟", answers: ["elephant", "an elephant", "فيل"] },
+        { question: "What animal hops and has a pouch? ما الحيوان الذي يقفز وله جيب؟", answers: ["kangaroo", "a kangaroo", "كنغر"] },
+        { question: "Which animal is known as man's best friend? ما الحيوان المعروف بأنه صديق الإنسان؟", answers: ["dog", "a dog", "كلب"] },
+        { question: "What black and white animal eats bamboo? ما الحيوان الأبيض والأسود الذي يأكل الخيزران؟", answers: ["panda", "a panda", "باندا"] },
+        { question: "What bird says 'hoot' at night? ما الطائر الذي يصدر صوت هووت في الليل؟", answers: ["owl", "an owl", "بومة"] },
+        { question: "Which animal has a very long neck? ما الحيوان الذي لديه رقبة طويلة جداً؟", answers: ["giraffe", "a giraffe", "زرافة"] },
+        { question: "What sea animal has eight legs? ما الحيوان البحري الذي لديه ثمانية أرجل؟", answers: ["octopus", "an octopus", "أخطبوط"] },
+        { question: "What big cat is known as the king of the jungle? ما الحيوان المفترس الذي يُعرف بملك الغابة؟", answers: ["lion", "a lion", "أسد"] },
+        { question: "Which animal is pink and loves mud? ما الحيوان الوردي الذي يحب الوحل؟", answers: ["pig", "a pig", "خنزير"] },
+        { question: "What animal says 'neigh'? ما الحيوان الذي يصدر صوت صهيل؟", answers: ["horse", "a horse", "حصان"] },
+        { question: "Which animal lays eggs and swims? ما الحيوان الذي يبيض ويسبح؟", answers: ["duck", "a duck", "بطة"] },
+        { question: "What animal has black and white stripes? ما الحيوان الذي لديه خطوط سوداء وبيضاء؟", answers: ["zebra", "a zebra", "حمار وحشي"] },
+        { question: "What small animal squeaks and likes cheese? ما الحيوان الصغير الذي يصدر صوت صرير ويحب الجبن؟", answers: ["mouse", "a mouse", "فأر"] },
+        { question: "What sea animal is very big and sprays water? ما الحيوان البحري الكبير الذي يرش الماء؟", answers: ["whale", "a whale", "حوت"] },
+        { question: "Which animal lives in a shell and walks slowly? ما الحيوان الذي يعيش في صدفة ويمشي ببطء؟", answers: ["turtle", "a turtle", "سلحفاة"] },
+        { question: "What animal is green and jumps in water? ما الحيوان الأخضر الذي يقفز في الماء؟", answers: ["frog", "a frog", "ضفدع"] },
+        { question: "What insect makes honey? ما الحشرة التي تصنع العسل؟", answers: ["bee", "a bee", "نحلة"] },
+        { question: "What animal lives in the desert and has a hump? ما الحيوان الذي يعيش في الصحراء وله سنام؟", answers: ["camel", "a camel", "جمل"] }
+      ];
+
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      let selectedQuestions = [];
+      let currentIndex = 0;
+      let score = 0;
+      let waitingForAnswer = false;
+      let waitingForReplay = false;
+
+      function startGame() {
+        shuffle(quizQuestions);
+        selectedQuestions = quizQuestions.slice(0, 3);
+        currentIndex = 0;
+        score = 0;
+        waitingForReplay = false;
+        askQuestion();
+      }
+
+      function askQuestion() {
+        if (currentIndex >= selectedQuestions.length) {
+          speakInSteps([
+            `You answered ${score} out of ${selectedQuestions.length} correctly.`,
+            "Do you want to play again? Say yes or no.",
+            "هل تريد اللعب مرة أخرى؟ قل نعم أو لا."
+          ]);
+          waitingForAnswer = false;
+          waitingForReplay = true;
+          return;
+        }
+
+        const q = selectedQuestions[currentIndex];
+        speak(q.question);
+        waitingForAnswer = true;
+      }
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+        console.log("Heard:", transcript);
+
+        if (transcript.includes("go back") || transcript.includes("back") || transcript.includes("رجوع") || transcript.includes("العودة")) {
+          speak("Going back to the games hub. العودة إلى صفحة الألعاب.");
+          setTimeout(() => {
+            window.location.href = '/games';
+          }, 3000);
+          return;
+        }
+
+        if (waitingForReplay) {
+          if (transcript.includes("yes") || transcript.includes("نعم")) {
+            startGame();
+          } else if (transcript.includes("no") || transcript.includes("لا")) {
+            speak("Okay! Going back to the games hub.");
+            setTimeout(() => {
+              window.location.href = '/games';
+            }, 3000);
+          } else {
+            speak("Please say yes or no. من فضلك قل نعم أو لا.");
+          }
+          return;
+        }
+
+        if (!waitingForAnswer) {
+          if (transcript.includes("start") || transcript.includes("ابدأ")) {
+            startGame();
+          } else {
+            speak("Say start to begin. قل ابدأ للبدء.");
+          }
+          return;
+        }
+
+        const q = selectedQuestions[currentIndex];
+        const correct = q.answers.some(ans => transcript.includes(ans));
+        if (correct) {
+          score++;
+          speakInSteps(["Correct! أحسنت!"], 0, () => {
+            currentIndex++;
+            askQuestion();
+          });
+        } else {
+          speakInSteps(["Oops! Not quite. حاول مرة أخرى!"], 0, () => {
+            currentIndex++;
+            askQuestion();
+          });
+        }
+      };
+
+      window.onload = () => {
+        recognition.start();
+        speak("Welcome to the Animal Facts Quiz! Say start to begin. مرحبًا! قل ابدأ لبدء اللعبة.");
+      };
+    }
+  </script>
+</body>
+</html>

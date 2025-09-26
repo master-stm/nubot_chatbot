@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Story Spinner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fff0f5;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 { font-size: 2rem; margin-bottom: 1rem; }
+    video {
+      margin-top: 20px;
+      width: 90vw;
+      max-height: 80vh;
+      display: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    #status { margin-top: 20px; font-size: 1.2rem; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>📚 Hey little buddy! Let's pick a story 🎬</h1>
+  <video id="storyVideo" playsinline></video>
+  <div id="status">Say the story name to begin: Room, Gruffalo, School, or Biscuit.</div>
+
+  <script>
+    const videoEl = document.getElementById("storyVideo");
+    const statusEl = document.getElementById("status");
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+    let isProcessing = false;
+
+    function startRecognition() {
+      if (!isProcessing) {
+        statusEl.textContent = "🎤 Listening...";
+        recognition.start();
+      }
+    }
+
+    function sendToGPT(text) {
+      isProcessing = true;
+      statusEl.textContent = "Processing...";
+      fetch("/get_response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text, lang: "en", source: "story-spinner" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        statusEl.textContent = data.text || "Hmm...";
+        if (data.audio) {
+          let audio = new Audio(data.audio);
+          audio.onended = () => {
+            isProcessing = false;
+            if (data.redirect) window.location.href = data.redirect;
+            else if (data.video) playVideo(data.video);
+            else startRecognition();
+          };
+          audio.play();
+        } else if (data.video) {
+          playVideo(data.video);
+        } else if (data.redirect) {
+          window.location.href = data.redirect;
+        } else {
+          isProcessing = false;
+          startRecognition();
+        }
+      })
+      .catch(err => {
+        console.error("Error:", err);
+        isProcessing = false;
+        statusEl.textContent = "Something went wrong...";
+        startRecognition();
+      });
+    }
+
+    function playVideo(src) {
+      videoEl.src = src;
+      videoEl.style.display = "block";
+      videoEl.load();
+      videoEl.play().catch(err => console.log("Play error:", err));
+      statusEl.textContent = "Enjoy the story!";
+    }
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+      console.log("Heard:", transcript);
+      sendToGPT(transcript);
+    };
+
+    recognition.onerror = () => {
+      isProcessing = false;
+      setTimeout(() => recognition.start(), 1000);
+    };
+
+    recognition.onend = () => {
+      if (!isProcessing) startRecognition();
+    };
+
+    window.onload = () => {
+      statusEl.textContent = "Say the story you want to watch: Room, Gruffalo, School, or Biscuit.";
+      startRecognition();
+    };
+  </script>
+</body>
+</html>

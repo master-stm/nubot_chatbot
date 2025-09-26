@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Games Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f0f8ff;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-top: 1rem;
+    }
+    .game-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+    .game-card {
+      width: 180px;
+      height: 180px;
+      margin: 10px;
+      background-color: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+    .game-card:hover {
+      transform: scale(1.05);
+      background-color: #d0f0ff;
+    }
+    .emoji {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    #status {
+      margin-top: 1.5rem;
+      font-size: 1.2rem;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎮 Welcome to the Games Page!</h1>
+  <div class="game-grid">
+    <div class="game-card" onclick="goTo('tic-tac-toe.html')">
+      <div class="emoji">❌⭕</div>
+      <div>Tic-Tac-Toe</div>
+    </div>
+    <div class="game-card" onclick="goTo('guess-animal.html')">
+      <div class="emoji">🐶🐱</div>
+      <div>Guess the Animal</div>
+    </div>
+    <div class="game-card" onclick="goTo('magic-math.html')">
+      <div class="emoji">🔢✨</div>
+      <div>Magic Math</div>
+    </div>
+    <div class="game-card" onclick="goTo('story-spinner.html')">
+      <div class="emoji">📖🎡</div>
+      <div>Story Spinner</div>
+    </div>
+  </div>
+  <div id="status">Say "Let's play" to begin...</div>
+
+  <script>
+    const statusBox = document.getElementById('status');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+
+    function speak(text) {
+      const synth = window.speechSynthesis;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'en-US';
+      synth.speak(utter);
+      statusBox.textContent = text;
+    }
+
+    function goTo(file) {
+      window.location.href = file;
+    }
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+      console.log('Heard:', transcript);
+
+      if (transcript.includes("let's play") || transcript.includes("play a game")) {
+        speak("Welcome to the games page! Here are four fun games. Say the name of the one you want to play: Tic Tac Toe, Guess the Animal, Magic Math, or Story Spinner.");
+      } else if (transcript.includes("tic tac toe")) {
+        goTo("tic-tac-toe.html");
+      } else if (transcript.includes("animal")) {
+        goTo("guess-animal.html");
+      } else if (transcript.includes("math")) {
+        goTo("magic-math.html");
+      } else if (transcript.includes("story")) {
+        goTo("story-spinner.html");
+      } else {
+        speak("Oops! I didn’t catch that. Can you say the game name again, pretty please?");
+      }
+    };
+
+    window.onload = () => {
+      recognition.start();
+    };
+  </script>
+</body>
+</html>

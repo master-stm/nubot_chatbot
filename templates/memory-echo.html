@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Memory Echo Game</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fffaf0;
+      text-align: center;
+      padding: 30px;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #333;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.2rem;
+      color: #444;
+      min-height: 60px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Memory Echo Game</h1>
+  <div id="status">Say "start" or "ابدأ" to begin!</div>
+
+  <script>
+    const statusBox = document.getElementById('status');
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      statusBox.textContent = 'Your browser does not support speech recognition.';
+    } else {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = true;
+
+      function speak(text, callback = null) {
+        const synth = window.speechSynthesis;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = text.match(/[\u0600-\u06FF]/) ? 'ar-SA' : 'en-US';
+        utter.rate = 1;
+
+        let timeoutId;
+        let speechCut = false;
+
+        utter.onstart = () => {
+          timeoutId = setTimeout(() => {
+            speechCut = true;
+            synth.cancel();
+            if (callback) callback();
+          }, 5000);
+        };
+
+        utter.onend = () => {
+          clearTimeout(timeoutId);
+          if (!speechCut && callback) callback();
+        };
+
+        synth.speak(utter);
+        statusBox.textContent = text;
+      }
+
+      function speakInSteps(texts, index = 0, finalCallback = null) {
+        if (index >= texts.length) {
+          if (finalCallback) finalCallback();
+          return;
+        }
+        speak(texts[index], () => speakInSteps(texts, index + 1, finalCallback));
+      }
+
+      const animals = [
+        { en: "lion", ar: "أسد" },
+        { en: "dog", ar: "كلب" },
+        { en: "cat", ar: "قطة" },
+        { en: "bee", ar: "نحلة" },
+        { en: "cow", ar: "بقرة" },
+        { en: "owl", ar: "بومة" },
+        { en: "frog", ar: "ضفدع" },
+        { en: "duck", ar: "بطة" },
+        { en: "elephant", ar: "فيل" },
+        { en: "turtle", ar: "سلحفاة" }
+      ];
+
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      let currentSequence = [];
+      let englishSentence = "";
+      let arabicSentence = "";
+      let level = 1;
+      let maxLevel = 3;
+      let waitingForRepeat = false;
+
+      function createSentence() {
+        shuffle(animals);
+        currentSequence = animals.slice(0, level);
+
+        const enList = currentSequence.map(a => a.en);
+        const arList = currentSequence.map(a => a.ar);
+
+        englishSentence = "I saw a " + enList.join(" and a ");
+        arabicSentence = "رأيت " + arList.join(" و ");
+
+        return [englishSentence, arabicSentence];
+      }
+
+      function startGame() {
+        level = 1;
+        nextRound();
+      }
+
+      function nextRound() {
+        const [en, ar] = createSentence();
+        speakInSteps([
+          `Level ${level}! Listen carefully.`,
+          "I will say a sentence, and you will repeat it!",
+          "Let's begin!",
+          `Here it is: ${en}`,
+          ar
+        ], 0, () => {
+          waitingForRepeat = true;
+        });
+      }
+
+      function checkAnswer(transcript) {
+        const t = transcript.toLowerCase().trim();
+        const correctEN = englishSentence.toLowerCase();
+        const correctAR = arabicSentence.replace("رأيت", "").trim();
+
+        const isCorrect =
+          t.includes(correctEN) ||
+          t.includes(correctAR) ||
+          currentSequence.every(animal =>
+            t.includes(animal.en) || t.includes(animal.ar)
+          );
+
+        if (isCorrect) {
+          if (level >= maxLevel) {
+            speakInSteps([
+              "Wow! You have an amazing memory!",
+              "أحسنت! ذاكرتك ممتازة!",
+              "You win! 🎉"
+            ]);
+            waitingForRepeat = false;
+          } else {
+            speakInSteps([
+              "Great job! Let's go to the next level.",
+              "أحسنت! لننتقل إلى المستوى التالي."
+            ], 0, () => {
+              level++;
+              nextRound();
+            });
+          }
+        } else {
+          speakInSteps([
+            "Oops! That was not quite right.",
+            "Try again from level one.",
+            "حاول مرة أخرى من البداية."
+          ], 0, startGame);
+          waitingForRepeat = false;
+        }
+      }
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        console.log("Heard:", transcript);
+
+        if (transcript.toLowerCase().includes("start") || transcript.includes("ابدأ")) {
+          startGame();
+          return;
+        }
+
+        if (waitingForRepeat) {
+          checkAnswer(transcript);
+        }
+      };
+
+      window.onload = () => {
+        recognition.start();
+        speakInSteps([
+          "Hello little genius!",
+          "This game is called Memory Echo!",
+          "I will say a sentence about animals.",
+          "You try to say the same thing after me.",
+          "If you get it right, we make it a little harder!",
+          "Say 'start' or 'ابدأ' to begin!"
+        ]);
+      };
+    }
+  </script>
+</body>
+</html>

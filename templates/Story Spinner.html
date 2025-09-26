@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Story Spinner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #fff0f5;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    .story-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+    .story-card {
+      width: 200px;
+      height: 260px;
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 10px;
+      flex-direction: column;
+    }
+    video {
+      margin-top: 20px;
+      width: 100vw;
+      height: 100vh;
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 9999;
+      background: #000;
+    }
+    #status {
+      margin-top: 20px;
+      font-size: 1.2rem;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>📚 Hey little buddy! Choose a story to watch 🎬</h1>
+
+  <div class="story-grid">
+    <div class="story-card" id="room">Room on the Broom</div>
+    <div class="story-card" id="gruffalo">The Gruffalo</div>
+    <div class="story-card" id="school">If I Built a School</div>
+    <div class="story-card" id="biscuit">Happy Birthday Biscuit</div>
+  </div>
+
+  <video id="storyVideo" playsinline></video>
+  <div id="status">Say a story name to begin.</div>
+
+  <script>
+    const videoEl = document.getElementById("storyVideo");
+    const statusEl = document.getElementById("status");
+
+    const videos = {
+      room: "/story/Room on the Broom.mp4",
+      gruffalo: "/story/The Gruffalo.mp4",
+      school: "/story/If I Built a School.mp4",
+      biscuit: "/story/Happy Birthday Biscuit.mp4"
+    };
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.continuous = true;
+
+    let waitingReplay = false;
+
+    function speak(text) {
+      const synth = window.speechSynthesis;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = "en-US";
+      synth.speak(utter);
+      statusEl.textContent = text;
+    }
+
+    async function playVideo(key) {
+      if (videos[key]) {
+        videoEl.src = videos[key];
+        videoEl.style.display = "block";
+        videoEl.muted = true;
+        videoEl.controls = true;
+        videoEl.load();
+
+        try {
+          await videoEl.play();
+          await videoEl.requestFullscreen();
+          speak("Great choice! Enjoy the story.");
+
+          setTimeout(() => {
+            videoEl.muted = false;
+            videoEl.currentTime = 0;
+            videoEl.play();
+          }, 500);
+
+        } catch (err) {
+          console.log("Autoplay error:", err);
+        }
+      }
+    }
+
+    videoEl.onended = () => {
+      waitingReplay = true;
+      document.exitFullscreen();
+      speak("Would you like to watch another story? Say yes or no.");
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+      console.log("Heard:", transcript);
+
+      if (waitingReplay) {
+        if (transcript.includes("yes")) {
+          waitingReplay = false;
+          videoEl.style.display = "none";
+          speak("Yay! Say the story name you want to watch.");
+        } else if (transcript.includes("no")) {
+          waitingReplay = false;
+          speak("Okay! Going back to the games page.");
+          window.location.href = "/games";
+        } else {
+          speak("Please say yes or no.");
+        }
+        return;
+      }
+
+      if (transcript.includes("room")) playVideo("room");
+      else if (transcript.includes("gruffalo")) playVideo("gruffalo");
+      else if (transcript.includes("school")) playVideo("school");
+      else if (transcript.includes("biscuit")) playVideo("biscuit");
+      else if (transcript.includes("play")) speak("Say the story name you want to watch: Room, Gruffalo, School, or Biscuit.");
+      else speak("Oops! Say the story name again, please.");
+    };
+
+    window.onload = () => {
+      recognition.start();
+      speak("Say the name of the story you want to watch: Room, Gruffalo, School, or Biscuit.");
+    };
+  </script>
+</body>
+</html>

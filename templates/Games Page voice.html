@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Games Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f0f8ff;
+    }
+    h1 { font-size: 2rem; margin-top: 1rem; }
+    .game-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+    .game-card {
+      width: 180px;
+      height: 180px;
+      margin: 10px;
+      background-color: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+    .game-card:hover {
+      transform: scale(1.05);
+      background-color: #d0f0ff;
+    }
+    .emoji { font-size: 2rem; margin-bottom: 0.5rem; }
+    #status { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>🎮 Welcome to the Games Page!</h1>
+  <div class="game-grid">
+    <div class="game-card" onclick="goTo('/games/tic-tac-toe')"><div class="emoji">❌⭕</div><div>Tic-Tac-Toe</div></div>
+    <div class="game-card" onclick="goTo('/games/guess-animal')"><div class="emoji">🐶🐱</div><div>Guess the Animal</div></div>
+    <div class="game-card" onclick="goTo('/games/magic-math')"><div class="emoji">🔢✨</div><div>Magic Math</div></div>
+    <div class="game-card" onclick="goTo('/games/story-spinner')"><div class="emoji">📖🌡</div><div>Story Spinner</div></div>
+    <div class="game-card" onclick="goTo('/games/animal-facts-quiz')"><div class="emoji">🐾❓</div><div>Animal Facts Quiz</div></div>
+    <div class="game-card" onclick="goTo('/games/memory-echo')"><div class="emoji">🧠🔁</div><div>Memory Echo</div></div>
+    <div class="game-card" onclick="goTo('/games/guess-the-number')"><div class="emoji">🎲❓</div><div>Guess the Number</div></div>
+  </div>
+
+  <div id="status">Say which game you want to play!</div>
+  <audio id="robot-audio"></audio>
+
+  <script>
+    const statusBox = document.getElementById("status");
+    const audioElement = document.getElementById("robot-audio");
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    let isProcessing = false;
+
+    function updateStatus(text) {
+      statusBox.textContent = text;
+    }
+
+    function goTo(page) {
+      window.location.href = page;
+    }
+
+    function speak(text, audioUrl, redirectUrl = null) {
+      updateStatus(text);
+      if (audioUrl) {
+        audioElement.src = audioUrl;
+        audioElement.onended = () => {
+          isProcessing = false;
+          if (redirectUrl) goTo(redirectUrl);
+          else startRecognition();
+        };
+        audioElement.play();
+      } else {
+        isProcessing = false;
+        startRecognition();
+      }
+    }
+
+    function sendToGPT(text) {
+      updateStatus("Processing...");
+      fetch("/get_response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text, lang: "en" })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const redirect = data.redirect || null;
+        speak(data.text, data.audio, redirect);
+      })
+      .catch(err => {
+        console.error("Error:", err);
+        updateStatus("Something went wrong...");
+        isProcessing = false;
+        startRecognition();
+      });
+    }
+
+    function startRecognition() {
+      if (isProcessing) return;
+      updateStatus("🎤 Listening...");
+      recognition.start();
+    }
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript.trim();
+      console.log("Heard:", transcript);
+      isProcessing = true;
+      sendToGPT(transcript);
+    };
+
+    recognition.onerror = () => {
+      isProcessing = false;
+      updateStatus("Try again...");
+      setTimeout(() => recognition.start(), 1000);
+    };
+
+    recognition.onend = () => {
+      if (!isProcessing) startRecognition();
+    };
+
+    window.onload = () => {
+      updateStatus("Hello! Tell me which game you want to play!");
+      startRecognition();
+    };
+  </script>
+</body>
+</html>
