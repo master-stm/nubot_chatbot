@@ -44,12 +44,28 @@
       font-size: 1.2rem;
       margin-top: 20px;
     }
+
+    /* Enable mic button (shown if browser blocks auto start) */
+    #enable-mic {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      background: linear-gradient(45deg, #4caf50, #2196f3);
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h1>❌⭕ Let's Play Tic-Tac-Toe!</h1>
   <div id="board"></div>
   <div id="status">Say easy, medium, or hard to choose your level.</div>
+  <button id="enable-mic" onclick="enableMic()">🎤 Enable Mic</button>
 
   <script>
     let board = Array(9).fill(null);
@@ -63,6 +79,7 @@
     let listeningForReplay = false;
     let waitingForDifficulty = true;
     let difficulty = 'easy';
+    let recognizing = false; // guard against double start
 
     function drawBoard() {
       boardEl.innerHTML = '';
@@ -81,6 +98,29 @@
       synth.speak(utter);
       statusEl.textContent = text;
     }
+    function startRecognition() {
+      if (recognizing) return;
+      try {
+        recognition.start();
+      } catch (e) {
+        if (e && e.name !== 'InvalidStateError') {
+          // Show enable button if blocked by policy
+          const btn = document.getElementById('enable-mic');
+          if (btn) btn.style.display = 'inline-block';
+        }
+      }
+    }
+
+    function enableMic() {
+      const btn = document.getElementById('enable-mic');
+      if (btn) btn.style.display = 'none';
+      startRecognition();
+    }
+
+    recognition.onstart = () => {
+      recognizing = true;
+      statusEl.textContent = 'Listening...';
+    };
 
     function checkWinner(b) {
       const lines = [
@@ -195,7 +235,22 @@
     window.onload = () => {
       drawBoard();
       speak("Hey little buddy! Before we start our fun game, tell me — do you want easy, medium, or hard mode?");
-      recognition.start();
+      startRecognition();
+      // Also try to start on first user interaction if blocked
+      window.addEventListener('click', () => startRecognition(), { once: true });
+      window.addEventListener('keydown', () => startRecognition(), { once: true });
+    };
+
+    recognition.onerror = () => {
+      recognizing = false;
+      // Try to restart after brief delay
+      setTimeout(() => startRecognition(), 600);
+    };
+
+    recognition.onend = () => {
+      recognizing = false;
+      // Keep listening continuously unless we're waiting for replay confirmation
+      if (!listeningForReplay) setTimeout(() => startRecognition(), 400);
     };
   </script>
 </body>

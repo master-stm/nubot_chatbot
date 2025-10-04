@@ -37,10 +37,28 @@
     }
     .emoji { font-size: 2rem; margin-bottom: 0.5rem; }
     #status { margin-top: 20px; font-weight: bold; }
+
+    /* Debug UI removed */
+
+    /* Enable audio UI (shown if autoplay is blocked) */
+    #enable-audio {
+      position: fixed;
+      bottom: 15px;
+      right: 15px;
+      background: linear-gradient(45deg, #4caf50, #2196f3);
+      color: #fff;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.2);
+      display: none;
+    }
   </style>
 </head>
 <body>
   <h1>🎮 Welcome to the Games Page!</h1>
+  
   <div class="game-grid">
     <div class="game-card" onclick="goTo('/games/tic-tac-toe')"><div class="emoji">❌⭕</div><div>Tic-Tac-Toe</div></div>
     <div class="game-card" onclick="goTo('/games/guess-animal')"><div class="emoji">🐶🐱</div><div>Guess the Animal</div></div>
@@ -53,6 +71,7 @@
 
   <div id="status">Say which game you want to play!</div>
   <audio id="robot-audio"></audio>
+  <button id="enable-audio" onclick="enableAudio()">🔊 Enable Sound</button>
 
   <script>
     const statusBox = document.getElementById("status");
@@ -62,6 +81,10 @@
     recognition.lang = 'en-US';
     recognition.continuous = false;
     let isProcessing = false;
+    let micActive = false;
+    let recognizing = false; // true while recognition is active
+    let pendingAudioSrc = null; // audio to play after user gesture
+    let userInteracted = false;
 
     function updateStatus(text) {
       statusBox.textContent = text;
@@ -70,6 +93,26 @@
     function goTo(page) {
       window.location.href = page;
     }
+
+    // Debug helpers removed
+
+    // Mark first user interaction to satisfy autoplay policies
+    function markUserInteraction() {
+      if (!userInteracted) {
+        userInteracted = true;
+        const btn = document.getElementById('enable-audio');
+        if (btn) btn.style.display = 'none';
+        if (pendingAudioSrc) {
+          audioElement.src = pendingAudioSrc;
+          pendingAudioSrc = null;
+          audioElement.play().catch(() => {/* ignore */});
+        }
+      }
+    }
+    window.addEventListener('click', markUserInteraction, { once: true });
+    window.addEventListener('keydown', markUserInteraction, { once: true });
+
+    // Debug endpoints and UI removed
 
     function speak(text, audioUrl, redirectUrl = null) {
       updateStatus(text);
@@ -80,7 +123,12 @@
           if (redirectUrl) goTo(redirectUrl);
           else startRecognition();
         };
-        audioElement.play();
+        audioElement.play().catch(() => {
+          pendingAudioSrc = audioUrl;
+          const btn = document.getElementById('enable-audio');
+          if (btn) btn.style.display = 'inline-block';
+          updateStatus('Tap Enable Sound to hear the reply.');
+        });
       } else {
         isProcessing = false;
         startRecognition();
@@ -100,7 +148,6 @@
         speak(data.text, data.audio, redirect);
       })
       .catch(err => {
-        console.error("Error:", err);
         updateStatus("Something went wrong...");
         isProcessing = false;
         startRecognition();
@@ -108,25 +155,38 @@
     }
 
     function startRecognition() {
-      if (isProcessing) return;
+      if (isProcessing || recognizing) return;
       updateStatus("🎤 Listening...");
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (e) {
+        // Guard InvalidStateError if already started
+        // swallow non-InvalidStateError silently
+      }
     }
+
+    recognition.onstart = () => {
+      recognizing = true;
+      micActive = true;
+    };
 
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript.trim();
-      console.log("Heard:", transcript);
       isProcessing = true;
       sendToGPT(transcript);
     };
 
     recognition.onerror = () => {
+      recognizing = false;
+      micActive = false;
       isProcessing = false;
       updateStatus("Try again...");
-      setTimeout(() => recognition.start(), 1000);
+      setTimeout(() => { if (!isProcessing && !recognizing) startRecognition(); }, 1000);
     };
 
     recognition.onend = () => {
+      recognizing = false;
+      micActive = false;
       if (!isProcessing) startRecognition();
     };
 
@@ -134,6 +194,18 @@
       updateStatus("Hello! Tell me which game you want to play!");
       startRecognition();
     };
+
+    function enableAudio() {
+      // User explicitly enabled audio
+      const btn = document.getElementById('enable-audio');
+      if (btn) btn.style.display = 'none';
+      userInteracted = true;
+      if (pendingAudioSrc) {
+        audioElement.src = pendingAudioSrc;
+        pendingAudioSrc = null;
+        audioElement.play().catch(() => {/* ignore */});
+      }
+    }
   </script>
 </body>
 </html>

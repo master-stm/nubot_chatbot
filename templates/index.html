@@ -93,7 +93,8 @@
   <button id="lang-toggle" onclick="toggleLanguage()">AR</button>
   <button id="games-button" onclick="goToGames()">🎮 Games</button>
   <!-- <button id="audio-test" onclick="testAudio()" style="position: fixed; top: 90px; right: 10px; background: #ff6b6b; color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-size: 12px;">🔊 Test Audio</button> -->
-  <audio id="robot-audio"></audio>
+  <audio id="robot-audio" preload="metadata"></audio>
+  
 
   <script>
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -102,6 +103,7 @@
     let isProcessing = false;
     let currentVideoState = "blinking";
     let currentResponse = ""; // Store current response
+    let currentAudioSrc = ""; // Track currently playing audio
     let hasPlayedWelcome = false; // Play welcome once
 
     const videoStates = {
@@ -148,15 +150,8 @@
       recognition.interimResults = false;
 
       recognition.onstart = () => {
-        // On first start, play a welcome message then resume recognition
-        if (!hasPlayedWelcome) {
-          hasPlayedWelcome = true;
-          stopRecognition();
-          isProcessing = true;
-          fetchWelcome();
-          return;
-        }
-        clearChat(); // Clear previous response when starting new recognition
+        // Normal start: show listening
+        clearChat();
         updateChat("Listening...");
       };
       recognition.onerror = () => retryRecognition();
@@ -226,36 +221,27 @@
     }
 
     function fetchWelcome() {
-      const text = currentLang === "ar" ? "مرحباً" : "Hello";
-      fetch("/get_response", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, lang: currentLang })
-      })
-      .then(res => res.json())
-      .then(data => {
-        // Show welcome text and play audio if available
-        updateChat(data.text || (currentLang === "ar" ? "أهلاً بك!" : "Welcome!"));
-        playEmotionVideo(analyzeEmotion(data.text || ""));
-        if (data.redirect) {
-          window.location.href = data.redirect;
-        } else if (data.audio) {
-          playAudio(data.audio);
-        } else {
-          isProcessing = false;
-          retryRecognition();
-        }
-      })
-      .catch(() => {
-        // If welcome fetch fails, continue normally
-        isProcessing = false;
-        retryRecognition();
-      });
+      // Play a local welcome audio once without backend request
+      const localAudio = "/static/response_1759251338.mp3";
+      const text = currentLang === "ar" ? "مرحباً! أنا نوبوت!" : "Hello! I'm Nubot!";
+      updateChat(text);
+      playEmotionVideo(analyzeEmotion(text));
+      playAudio(localAudio);
     }
 
     function playAudio(src) {
       const audio = document.getElementById("robot-audio");
-      audio.src = src;
+
+      // Avoid reloading/playing the same audio repeatedly
+      const audioSrcMatches = audio.src && audio.src.endsWith(src);
+      if (audioSrcMatches && !audio.ended && !audio.paused) {
+        return;
+      }
+
+      if (!audioSrcMatches) {
+        audio.src = src;
+        currentAudioSrc = src;
+      }
 
       audio.onerror = () => {
         console.warn("Audio failed to play.");
@@ -355,7 +341,14 @@
 
     window.onload = () => {
       document.getElementById("lang-toggle").textContent = currentLang.toUpperCase();
-      startRecognition();
+      // Play welcome once after 1 second, then recognition will resume
+      setTimeout(() => {
+        if (!hasPlayedWelcome) {
+          hasPlayedWelcome = true;
+          isProcessing = true;
+          fetchWelcome();
+        }
+      }, 1000);
     };
   </script>
 </body>

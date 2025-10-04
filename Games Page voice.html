@@ -92,7 +92,7 @@
 
     recognition.onresult = (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
-      console.log('Heard:', transcript);
+      
 
       if (transcript.includes("let's play") || transcript.includes("play a game")) {
         speak("Welcome to the games page! Here are four fun games. Say the name of the one you want to play: Tic Tac Toe, Guess the Animal, Magic Math, or Story Spinner.");

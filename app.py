@@ -1,6 +1,15 @@
 import openai
 from flask import Flask, request, jsonify, render_template, send_from_directory
-import pygame
+try:
+    import pygame
+    try:
+        pygame.mixer.init()
+    except Exception as audio_init_error:
+        print(f"Pygame audio disabled: {audio_init_error}")
+        pygame = None
+except Exception as pygame_import_error:
+    print(f"Pygame not available: {pygame_import_error}")
+    pygame = None
 import os
 import time
 import speech_recognition as sr
@@ -29,7 +38,7 @@ client = openai.OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
 
-pygame.mixer.init()
+# pygame mixer initialization moved into guarded import above
 
 # ✅ Your unchanged system prompts with game logic appended
 system_prompts = {
@@ -646,4 +655,6 @@ def toggle_offline_mode():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False, port=8080)
+    port = int(os.getenv("PORT", "8080"))
+    debug = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    app.run(host="0.0.0.0", debug=debug, use_reloader=False, port=port)
